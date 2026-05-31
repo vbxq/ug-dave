@@ -1,0 +1,107 @@
+diff --git a/cpp/test/capi/external_sender_wrapper.cpp b/cpp/test/capi/external_sender_wrapper.cpp
+index db8f816..0d9aad9 100644
+--- a/cpp/test/capi/external_sender_wrapper.cpp
++++ b/cpp/test/capi/external_sender_wrapper.cpp
+@@ -65,6 +65,18 @@ void daveExternalSenderProposeAdd(DAVEExternalSenderHandle externalSenderHandle,
+     CopyVectorToOutputBuffer(result, proposal, proposalLength);
+ }
+ 
++void daveExternalSenderProposeRemove(DAVEExternalSenderHandle externalSenderHandle,
++                                     uint32_t epoch,
++                                     uint32_t leafIndex,
++                                     uint8_t** proposal,
++                                     size_t* proposalLength)
++{
++    auto externalSender =
++      reinterpret_cast<discord::dave::test::ExternalSender*>(externalSenderHandle);
++    auto result = externalSender->ProposeRemove(epoch, leafIndex);
++    CopyVectorToOutputBuffer(result, proposal, proposalLength);
++}
++
+ void daveExternalSenderSplitCommitWelcome(DAVEExternalSenderHandle externalSenderHandle,
+                                           uint8_t* commitWelcome,
+                                           size_t commitWelcomeLength,
+diff --git a/cpp/test/capi/external_sender_wrapper.h b/cpp/test/capi/external_sender_wrapper.h
+index 6a49556..366ed68 100644
+--- a/cpp/test/capi/external_sender_wrapper.h
++++ b/cpp/test/capi/external_sender_wrapper.h
+@@ -19,6 +19,11 @@ DAVE_EXPORT void daveExternalSenderProposeAdd(DAVEExternalSenderHandle externalS
+                                               size_t keyPackageLength,
+                                               uint8_t** proposal,
+                                               size_t* proposalLength);
++DAVE_EXPORT void daveExternalSenderProposeRemove(DAVEExternalSenderHandle externalSender,
++                                                 uint32_t epoch,
++                                                 uint32_t leafIndex,
++                                                 uint8_t** proposal,
++                                                 size_t* proposalLength);
+ DAVE_EXPORT void daveExternalSenderSplitCommitWelcome(DAVEExternalSenderHandle externalSender,
+                                                       uint8_t* commitWelcome,
+                                                       size_t commitWelcomeLength,
+diff --git a/cpp/test/external_sender.cpp b/cpp/test/external_sender.cpp
+index 9c8661b..c32ab68 100644
+--- a/cpp/test/external_sender.cpp
++++ b/cpp/test/external_sender.cpp
+@@ -56,22 +56,46 @@ std::vector<uint8_t> ExternalSender::ProposeAdd(uint32_t epoch,
+     return out.bytes();
+ }
+ 
++std::vector<uint8_t> ExternalSender::ProposeRemove(uint32_t epoch, uint32_t leafIndex)
++{
++    auto proposal = ::mlspp::Proposal{::mlspp::Remove{::mlspp::LeafIndex{leafIndex}}};
++    auto message = ::mlspp::external_proposal(
++      ciphersuite_, groupId_, epoch, proposal, signerIndex_, *signaturePrivateKey_);
++
++    bool isRevoke = false;
++    ::mlspp::tls::ostream out;
++    out << isRevoke;
++    out << std::vector<::mlspp::MLSMessage>{message};
++    return out.bytes();
++}
++
+ std::pair<std::vector<uint8_t>, std::vector<uint8_t>> ExternalSender::SplitCommitWelcome(
+   std::vector<uint8_t> const& commitWelcome)
+ {
+     auto commitWelcomeBytes = ::mlspp::bytes_ns::bytes(commitWelcome);
+     ::mlspp::tls::istream in(commitWelcomeBytes);
+     ::mlspp::MLSMessage commitMessage;
+-    ::mlspp::Welcome welcomeMessage;
+     in >> commitMessage;
+-    in >> welcomeMessage;
+ 
+     ::mlspp::tls::ostream commitOut;
+     commitOut << commitMessage;
+     auto commitBytes = commitOut.bytes();
+-    ::mlspp::tls::ostream welcomeOut;
+-    welcomeOut << welcomeMessage;
+-    auto welcomeBytes = welcomeOut.bytes();
++
++    // A commit that adds members carries a trailing Welcome; a Remove-only commit
++    // does not (libdave's Session::ProcessProposals only appends the Welcome when
++    // welcomeMessage.secrets is non-empty, i.e. when there were Add proposals --
++    // cpp/src/mls/session.cpp). Reading a Welcome off an exhausted stream would
++    // throw across the C ABI boundary, so only parse one when bytes remain. An
++    // empty welcomeBytes is the correct signal to the caller that this commit
++    // welcomes nobody (Remove).
++    std::vector<uint8_t> welcomeBytes;
++    if (!in.empty()) {
++        ::mlspp::Welcome welcomeMessage;
++        in >> welcomeMessage;
++        ::mlspp::tls::ostream welcomeOut;
++        welcomeOut << welcomeMessage;
++        welcomeBytes = welcomeOut.bytes();
++    }
+     return std::make_pair(commitBytes, welcomeBytes);
+ }
+ 
+diff --git a/cpp/test/external_sender.h b/cpp/test/external_sender.h
+index 058ecb4..fb56b3b 100644
+--- a/cpp/test/external_sender.h
++++ b/cpp/test/external_sender.h
+@@ -13,6 +13,7 @@ public:
+ 
+     std::vector<uint8_t> GetMarshalledExternalSender();
+     std::vector<uint8_t> ProposeAdd(uint32_t epoch, std::vector<uint8_t> const& keyPackage);
++    std::vector<uint8_t> ProposeRemove(uint32_t epoch, uint32_t leafIndex);
+     std::pair<std::vector<uint8_t>, std::vector<uint8_t>> SplitCommitWelcome(
+       std::vector<uint8_t> const& commitWelcome);
+ 

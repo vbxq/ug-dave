@@ -27,6 +27,21 @@ if [ "$(git rev-parse HEAD 2>/dev/null)" != "$LIBDAVE_COMMIT" ]; then
   git checkout --quiet "$LIBDAVE_COMMIT"
 fi
 
+# Celeste external-sender patch: adds ExternalSender::ProposeRemove (MLS member-remove on leave)
+# and makes SplitCommitWelcome tolerate a Remove-only commit which carries no Welcome
+# this is reapplied on every build
+ES_PATCH="$CRATE_DIR/patches/external_sender_propose_remove.patch"
+if [ -f "$ES_PATCH" ]; then
+  if git apply --reverse --check "$ES_PATCH" 2>/dev/null; then
+    log "external-sender ProposeRemove patch already applied"
+  elif git apply --check "$ES_PATCH" 2>/dev/null; then
+    log "applying external-sender ProposeRemove patch"
+    git apply "$ES_PATCH"
+  else
+    log "[*] warning! external-sender ProposeRemove patch does not apply cleanly... (libdave bumped? regenerate patches/external_sender_propose_remove.patch)"
+  fi
+fi
+
 log "init vcpkg submodule (full history manifest baselines need it)"
 git submodule update --init cpp/vcpkg
 if [ "$(git -C cpp/vcpkg rev-parse --is-shallow-repository)" = "true" ]; then

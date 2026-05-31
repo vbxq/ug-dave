@@ -33,6 +33,9 @@ impl ExternalSender {
     pub(crate) fn propose_add(&self, _epoch: u32, _key_package: &[u8]) -> Result<Vec<u8>, DaveError> {
         match *self {}
     }
+    pub(crate) fn propose_remove(&self, _epoch: u32, _leaf_index: u32) -> Result<Vec<u8>, DaveError> {
+        match *self {}
+    }
     pub(crate) fn split_commit_welcome(
         &self,
         _commit_welcome: &[u8],

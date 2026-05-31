@@ -85,6 +85,17 @@ impl ExternalSender {
         self.0.propose_add(epoch, key_package)
     }
 
+    /// propose removing the member at MLS `leaf_index` at `epoch`
+    /// returns the marshalled proposal (OP 27 payload body).
+    ///
+    /// spec mandates the external sender propose the removal of a participant when it disconnects
+    /// (unofficial documentation/userdoccers voice-connections.mdx L525-527)
+    ///
+    /// a remaining member commits it so the group advances one epoch without a destructive re-key
+    pub fn propose_remove(&self, epoch: u32, leaf_index: u32) -> Result<Vec<u8>, DaveError> {
+        self.0.propose_remove(epoch, leaf_index)
+    }
+
     /// split a client's combined commit+welcome (OP 28 body) into the commit (relayed as OP 29 announce) and the welcome (relayed as OP 30)
     pub fn split_commit_welcome(
         &self,

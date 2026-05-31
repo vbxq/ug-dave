@@ -119,6 +119,13 @@ extern "C" {
         proposal: *mut *mut u8,
         proposal_len: *mut usize,
     );
+    fn daveExternalSenderProposeRemove(
+        handle: ExternalSenderHandle,
+        epoch: u32,
+        leaf_index: u32,
+        proposal: *mut *mut u8,
+        proposal_len: *mut usize,
+    );
     fn daveExternalSenderSplitCommitWelcome(
         handle: ExternalSenderHandle,
         commit_welcome: *mut u8,
@@ -297,6 +304,17 @@ impl ExternalSender {
             take_bytes(out, len)
         };
         non_empty(bytes, "external_sender_propose_add")
+    }
+
+    pub(crate) fn propose_remove(&self, epoch: u32, leaf_index: u32) -> Result<Vec<u8>, DaveError> {
+        let mut out = ptr::null_mut();
+        let mut len = 0usize;
+        // SAFETY: out/len receive a malloc'd buffer freed by take_bytes
+        let bytes = unsafe {
+            daveExternalSenderProposeRemove(self.handle, epoch, leaf_index, &mut out, &mut len);
+            take_bytes(out, len)
+        };
+        non_empty(bytes, "external_sender_propose_remove")
     }
 
     pub(crate) fn split_commit_welcome(
