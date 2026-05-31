@@ -1,0 +1,15 @@
+[package]
+name = "ug-dave"
+version = "0.1.0"
+edition = "2021"
+
+[features]
+default = []
+dave-ffi = []
+
+[dependencies]
+thiserror.workspace = true
+tracing.workspace = true
+
+[lints]
+workspace = true
