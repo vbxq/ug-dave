@@ -52,9 +52,18 @@ extern "C" {
         user_data: *mut c_void,
     ) -> SessionHandle;
     fn daveSessionDestroy(session: SessionHandle);
-    fn daveSessionInit(session: SessionHandle, version: u16, group_id: u64, self_user_id: *const c_char);
+    fn daveSessionInit(
+        session: SessionHandle,
+        version: u16,
+        group_id: u64,
+        self_user_id: *const c_char,
+    );
     fn daveSessionGetProtocolVersion(session: SessionHandle) -> u16;
-    fn daveSessionSetExternalSender(session: SessionHandle, external_sender: *const u8, length: usize);
+    fn daveSessionSetExternalSender(
+        session: SessionHandle,
+        external_sender: *const u8,
+        length: usize,
+    );
     fn daveSessionGetMarshalledKeyPackage(
         session: SessionHandle,
         key_package: *mut *mut u8,
@@ -139,7 +148,11 @@ extern "C" {
 
 // log/failure callback bridges (no secret material libdave diagnostics)
 
-extern "C" fn mls_failure_cb(source: *const c_char, reason: *const c_char, _user_data: *mut c_void) {
+extern "C" fn mls_failure_cb(
+    source: *const c_char,
+    reason: *const c_char,
+    _user_data: *mut c_void,
+) {
     tracing::warn!(
         target: "ug_dave",
         source = %cstr_lossy(source),
@@ -148,7 +161,12 @@ extern "C" fn mls_failure_cb(source: *const c_char, reason: *const c_char, _user
     );
 }
 
-extern "C" fn log_sink_cb(severity: c_int, _file: *const c_char, line: c_int, message: *const c_char) {
+extern "C" fn log_sink_cb(
+    severity: c_int,
+    _file: *const c_char,
+    line: c_int,
+    message: *const c_char,
+) {
     // libdave's own diagnostic strings (status/flow). Not Celeste tokens/keys those never transit libdave.
     // Mapped to bounded tracing levels
     let msg = cstr_lossy(message);
@@ -167,7 +185,9 @@ fn cstr_lossy(ptr: *const c_char) -> String {
     }
     // SAFETY: libdave passes a valid NUL-terminated C string for the duration of the callback
     // we copy it before returning (it frees the string after).
-    unsafe { CStr::from_ptr(ptr) }.to_string_lossy().into_owned()
+    unsafe { CStr::from_ptr(ptr) }
+        .to_string_lossy()
+        .into_owned()
 }
 
 static LOG_SINK_ONCE: Once = Once::new();
@@ -208,7 +228,9 @@ unsafe fn take_u64s(ptr: *mut u64, len: usize) -> Vec<u64> {
 
 fn cstrings(ids: &[&str]) -> Result<Vec<CString>, DaveError> {
     ids.iter()
-        .map(|s| CString::new(*s).map_err(|_| DaveError::Invalid("user id contains an interior NUL")))
+        .map(|s| {
+            CString::new(*s).map_err(|_| DaveError::Invalid("user id contains an interior NUL"))
+        })
         .collect()
 }
 
@@ -243,7 +265,14 @@ pub(crate) fn create_session(
 ) -> Result<Session, DaveError> {
     ensure_log_sink();
     // SAFETY: callback is a valid `extern "C" fn`; context/user_data may be null.
-    let handle = unsafe { daveSessionCreate(ptr::null_mut(), ptr::null(), mls_failure_cb, ptr::null_mut()) };
+    let handle = unsafe {
+        daveSessionCreate(
+            ptr::null_mut(),
+            ptr::null(),
+            mls_failure_cb,
+            ptr::null_mut(),
+        )
+    };
     if handle.is_null() {
         return Err(DaveError::Lib {
             operation: "session_create",
@@ -334,7 +363,10 @@ impl ExternalSender {
                 &mut welcome_ptr,
                 &mut welcome_len,
             );
-            (take_bytes(commit_ptr, commit_len), take_bytes(welcome_ptr, welcome_len))
+            (
+                take_bytes(commit_ptr, commit_len),
+                take_bytes(welcome_ptr, welcome_len),
+            )
         };
         if commit.is_empty() {
             return Err(DaveError::Lib {
@@ -410,7 +442,8 @@ impl Session {
 
     pub(crate) fn process_commit(&mut self, commit: &[u8]) -> Result<Roster, DaveError> {
         // SAFETY: commit is a valid slice, result handle freed in roster_from_commit
-        let handle = unsafe { daveSessionProcessCommit(self.handle, commit.as_ptr(), commit.len()) };
+        let handle =
+            unsafe { daveSessionProcessCommit(self.handle, commit.as_ptr(), commit.len()) };
         if handle.is_null() {
             return Err(DaveError::Lib {
                 operation: "process_commit",
@@ -453,7 +486,9 @@ impl Session {
             daveWelcomeResultDestroy(handle);
             members
         };
-        Ok(Roster { member_ids: members })
+        Ok(Roster {
+            member_ids: members,
+        })
     }
 
     pub(crate) fn last_epoch_authenticator(&mut self) -> Result<Vec<u8>, DaveError> {
@@ -482,7 +517,9 @@ unsafe fn roster_from_commit(handle: CommitResultHandle) -> Result<Roster, DaveE
     daveCommitResultGetRosterMemberIds(handle, &mut ids, &mut ids_len);
     let members = take_u64s(ids, ids_len);
     daveCommitResultDestroy(handle);
-    Ok(Roster { member_ids: members })
+    Ok(Roster {
+        member_ids: members,
+    })
 }
 
 fn non_empty(bytes: Vec<u8>, operation: &'static str) -> Result<Vec<u8>, DaveError> {

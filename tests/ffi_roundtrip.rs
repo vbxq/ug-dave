@@ -27,8 +27,10 @@ fn mls_group_establishes_between_two_members() {
 
     // server advertises the external-sender package (OP 25); members install it.
     let package = ext.marshalled_package().expect("external sender package");
-    a.set_external_sender(&package).expect("A installs external sender");
-    b.set_external_sender(&package).expect("B installs external sender");
+    a.set_external_sender(&package)
+        .expect("A installs external sender");
+    b.set_external_sender(&package)
+        .expect("B installs external sender");
 
     // members produce key packages (OP 26).
     let _kp_a = a.marshalled_key_package().expect("A key package");
@@ -41,7 +43,9 @@ fn mls_group_establishes_between_two_members() {
         .expect("A processes proposals");
 
     // server splits into commit (OP 29 announce) + welcome (OP 30).
-    let (commit, welcome) = ext.split_commit_welcome(&commit_welcome).expect("split commit/welcome");
+    let (commit, welcome) = ext
+        .split_commit_welcome(&commit_welcome)
+        .expect("split commit/welcome");
 
     let roster_a = a.process_commit(&commit).expect("A processes commit");
     let roster_b = b
@@ -60,5 +64,8 @@ fn mls_group_establishes_between_two_members() {
     // both members agree on the epoch authenticator -> same group state.
     let auth_a = a.last_epoch_authenticator().expect("A epoch authenticator");
     let auth_b = b.last_epoch_authenticator().expect("B epoch authenticator");
-    assert_eq!(auth_a, auth_b, "epoch authenticators must match across members");
+    assert_eq!(
+        auth_a, auth_b,
+        "epoch authenticators must match across members"
+    );
 }

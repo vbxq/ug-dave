@@ -49,7 +49,15 @@ fn main() {
         println!("cargo:rustc-link-search=native={}", dir.display());
     }
     println!("cargo:rustc-link-lib=static:+verbatim=external_sender.a");
-    for lib in ["dave", "mlspp", "hpke", "tls_syntax", "bytes", "ssl", "crypto"] {
+    for lib in [
+        "dave",
+        "mlspp",
+        "hpke",
+        "tls_syntax",
+        "bytes",
+        "ssl",
+        "crypto",
+    ] {
         println!("cargo:rustc-link-lib=static={lib}");
     }
     println!("cargo:rustc-link-lib=dylib=stdc++");
@@ -57,6 +65,12 @@ fn main() {
     println!("cargo:rustc-link-lib=dylib=dl");
     println!("cargo:rustc-link-lib=dylib=m");
 
-    println!("cargo:rerun-if-changed={}", build_dir.join("libdave.a").display());
-    println!("cargo:rerun-if-changed={}", capi_dir.join("external_sender.a").display());
+    println!(
+        "cargo:rerun-if-changed={}",
+        build_dir.join("libdave.a").display()
+    );
+    println!(
+        "cargo:rerun-if-changed={}",
+        capi_dir.join("external_sender.a").display()
+    );
 }
